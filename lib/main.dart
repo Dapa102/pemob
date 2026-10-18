@@ -1,346 +1,314 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-class Barang {
-  final String nama;
-  final int jumlah;
-  final String kategori;
-  bool sudahDibeli;
+// Bagian A sampai D modul Pertemuan 6: Tema, Routing/Navigasi, dan Animasi.
 
-  Barang({
-    required this.nama,
-    required this.jumlah,
-    required this.kategori,
-    this.sudahDibeli = false,
-  });
-}
+// Dua ValueNotifier global menyimpan pilihan tema aplikasi.
+final themeMode = ValueNotifier<ThemeMode>(ThemeMode.light);
+final seedColor = ValueNotifier<Color>(Colors.indigo);
 
-class BelanjaModel extends ChangeNotifier {
-  final List<Barang> _items = [];
+const pilihanWarna = [
+  Colors.indigo,
+  Colors.teal,
+  Colors.deepOrange,
+  Colors.pink,
+];
 
-  List<Barang> get items => List.unmodifiable(_items);
-
-  // Menghitung jumlah barang yang belum dibeli
-  int get jumlahBelumDibeli {
-    return _items.where((barang) => !barang.sudahDibeli).length;
-  }
-
-  // Menambahkan barang
-  void tambahBarang({
-    required String nama,
-    required int jumlah,
-    required String kategori,
-  }) {
-    _items.add(
-      Barang(
-        nama: nama,
-        jumlah: jumlah,
-        kategori: kategori,
-      ),
-    );
-
-    notifyListeners();
-  }
-
-  // Mengubah status sudah dibeli
-  void toggleDibeli(int index) {
-    _items[index].sudahDibeli = !_items[index].sudahDibeli;
-    notifyListeners();
-  }
-
-  // Menghapus barang
-  void hapusBarang(int index) {
-    _items.removeAt(index);
-    notifyListeners();
-  }
-}
-
-void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => BelanjaModel(),
-      child: const MyApp(),
-    ),
+ThemeData buatTema(Color seed, Brightness brightness) {
+  return ThemeData(
+    useMaterial3: true,
+    colorSchemeSeed: seed,
+    brightness: brightness,
+    appBarTheme: const AppBarTheme(centerTitle: true),
   );
 }
+
+void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Daftar Belanja',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.green,
-        useMaterial3: true,
-      ),
-      home: const DaftarPage(),
+    return ListenableBuilder(
+      listenable: Listenable.merge([themeMode, seedColor]),
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Praktikum 6',
+          debugShowCheckedModeBanner: false,
+          theme: buatTema(seedColor.value, Brightness.light),
+          darkTheme: buatTema(seedColor.value, Brightness.dark),
+          themeMode: themeMode.value,
+          initialRoute: '/',
+          routes: {'/': (_) => const ShellPage()},
+          // Rute yang membawa argumen ditangani di sini
+          onGenerateRoute: (settings) {
+            if (settings.name == '/detail') {
+              final item = settings.arguments as Item;
+              return MaterialPageRoute(
+                builder: (_) => DetailPage(item: item),
+                settings: settings,
+              );
+            }
+            return null;
+          },
+        );
+      },
     );
   }
 }
 
-class DaftarPage extends StatelessWidget {
-  const DaftarPage({super.key});
+// ---------- BAGIAN A: PENGATURAN TEMA ----------
+class PengaturanTab extends StatelessWidget {
+  const PengaturanTab({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final model = context.watch<BelanjaModel>();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Daftar Belanja (${model.jumlahBelumDibeli})',
-        ),
-      ),
-
-      body: model.items.isEmpty
-          ? const Center(
-              child: Text(
-                'Belum ada barang',
-                style: TextStyle(
-                  fontSize: 18,
-                ),
-              ),
-            )
-          : ListView.builder(
-              itemCount: model.items.length,
-              itemBuilder: (context, index) {
-                final barang = model.items[index];
-
-                return ListTile(
-                  // Checkbox
-                  leading: Checkbox(
-                    value: barang.sudahDibeli,
-                    onChanged: (_) {
-                      context
-                          .read<BelanjaModel>()
-                          .toggleDibeli(index);
-                    },
-                  ),
-
-                  // Nama barang
-                  title: Text(
-                    barang.nama,
-                    style: TextStyle(
-                      fontSize: 17,
-                      decoration: barang.sudahDibeli
-                          ? TextDecoration.lineThrough
+    return ListenableBuilder(
+      listenable: Listenable.merge([themeMode, seedColor]),
+      builder: (context, _) {
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            SwitchListTile(
+              title: const Text('Mode gelap'),
+              value: themeMode.value == ThemeMode.dark,
+              onChanged: (v) {
+                themeMode.value = v ? ThemeMode.dark : ThemeMode.light;
+              },
+            ),
+            const SizedBox(height: 8),
+            Text('Warna tema', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              children: [
+                for (final c in pilihanWarna)
+                  GestureDetector(
+                    onTap: () => seedColor.value = c,
+                    child: CircleAvatar(
+                      backgroundColor: c,
+                      child: seedColor.value == c
+                          ? const Icon(Icons.check, color: Colors.white)
                           : null,
                     ),
                   ),
-
-                  // Jumlah dan kategori
-                  subtitle: Text(
-                    '${barang.jumlah} • ${barang.kategori}',
-                  ),
-
-                  // Tombol hapus
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () {
-                      context
-                          .read<BelanjaModel>()
-                          .hapusBarang(index);
-                    },
-                  ),
-                );
-              },
+              ],
             ),
+          ],
+        );
+      },
+    );
+  }
+}
 
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final berhasil = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const TambahBarangPage(),
+// ---------- BAGIAN B: NAMED ROUTES, ARGUMEN, DAN HERO ----------
+class Item {
+  final String nama;
+  final IconData ikon;
+  final Color warna;
+  const Item(this.nama, this.ikon, this.warna);
+}
+
+const daftarItem = [
+  Item('Flutter', Icons.flutter_dash, Colors.blue),
+  Item('Musik', Icons.music_note, Colors.pink),
+  Item('Kamera', Icons.camera_alt, Colors.orange),
+  Item('Peta', Icons.map, Colors.green),
+];
+
+class BerandaTab extends StatelessWidget {
+  const BerandaTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: daftarItem.length,
+      itemBuilder: (context, i) {
+        final item = daftarItem[i];
+        return ListTile(
+          leading: Hero(
+            tag: 'ikon-${item.nama}',
+            child: CircleAvatar(
+              backgroundColor: item.warna,
+              child: Icon(item.ikon, color: Colors.white),
             ),
-          );
+          ),
+          title: Text(item.nama),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.pushNamed(context, '/detail', arguments: item);
+          },
+        );
+      },
+    );
+  }
+}
 
-          // SnackBar setelah berhasil menambahkan barang
-          if (berhasil == true && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Barang ditambahkan'),
+class DetailPage extends StatelessWidget {
+  final Item item;
+  const DetailPage({super.key, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(item.nama)),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Hero(
+              tag: 'ikon-${item.nama}',
+              child: CircleAvatar(
+                radius: 64,
+                backgroundColor: item.warna,
+                child: Icon(item.ikon, size: 64, color: Colors.white),
               ),
-            );
-          }
-        },
-        child: const Icon(Icons.add),
+            ),
+            const SizedBox(height: 16),
+            Text(item.nama, style: tema.textTheme.headlineMedium),
+            Text('Detail untuk ${item.nama}', style: tema.textTheme.bodyMedium),
+          ],
+        ),
       ),
     );
   }
 }
 
-class TambahBarangPage extends StatefulWidget {
-  const TambahBarangPage({super.key});
+// ---------- BAGIAN C: ANIMASI ----------
+class AnimasiTab extends StatefulWidget {
+  const AnimasiTab({super.key});
 
   @override
-  State<TambahBarangPage> createState() =>
-      _TambahBarangPageState();
+  State<AnimasiTab> createState() => _AnimasiTabState();
 }
 
-class _TambahBarangPageState extends State<TambahBarangPage> {
-  // Form key
-  final _formKey = GlobalKey<FormState>();
+class _AnimasiTabState extends State<AnimasiTab>
+    with SingleTickerProviderStateMixin {
+  bool _besar = false;
+  int _hitung = 0;
+  late final AnimationController _putar;
 
-  // Controller
-  final _namaController = TextEditingController();
-  final _jumlahController = TextEditingController();
-
-  // Menyimpan kategori yang dipilih
-  String? _kategori;
-
-  // Daftar kategori
-  final List<String> _kategoriList = [
-    'Makanan',
-    'Minuman',
-    'Kebutuhan Rumah',
-    'Elektronik',
-    'Lainnya',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _putar = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
 
   @override
   void dispose() {
-    _namaController.dispose();
-    _jumlahController.dispose();
+    _putar.dispose();
     super.dispose();
-  }
-
-  void _simpan() {
-    // Jalankan validasi
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    final nama = _namaController.text.trim();
-
-    final jumlah = int.parse(
-      _jumlahController.text.trim(),
-    );
-
-    // Tambahkan ke Provider
-    context.read<BelanjaModel>().tambahBarang(
-          nama: nama,
-          jumlah: jumlah,
-          kategori: _kategori!,
-        );
-
-    // Kembali ke halaman daftar
-    Navigator.pop(context, true);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tambah Barang'),
-      ),
+    final tema = Theme.of(context);
+    final warna = tema.colorScheme;
 
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-
-        child: Form(
-          key: _formKey,
-
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _namaController,
-                decoration: const InputDecoration(
-                  labelText: 'Nama Barang',
-                  hintText: 'Contoh: Beras',
-                  border: OutlineInputBorder(),
-                ),
-
-                validator: (value) {
-                  if (value == null ||
-                      value.trim().isEmpty) {
-                    return 'Nama barang wajib diisi';
-                  }
-
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _jumlahController,
-
-                keyboardType: TextInputType.number,
-
-                decoration: const InputDecoration(
-                  labelText: 'Jumlah',
-                  hintText: 'Contoh: 1',
-                  border: OutlineInputBorder(),
-                ),
-
-                validator: (value) {
-                  if (value == null ||
-                      value.trim().isEmpty) {
-                    return 'Jumlah wajib diisi';
-                  }
-
-                  final jumlah = int.tryParse(
-                    value.trim(),
-                  );
-
-                  if (jumlah == null) {
-                    return 'Jumlah harus berupa angka';
-                  }
-
-                  if (jumlah <= 0) {
-                    return 'Jumlah harus lebih dari 0';
-                  }
-
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: _kategori,
-
-                decoration: const InputDecoration(
-                  labelText: 'Kategori',
-                  border: OutlineInputBorder(),
-                ),
-
-                items: _kategoriList.map((kategori) {
-                  return DropdownMenuItem<String>(
-                    value: kategori,
-                    child: Text(kategori),
-                  );
-                }).toList(),
-
-                onChanged: (value) {
-                  setState(() {
-                    _kategori = value;
-                  });
-                },
-
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Kategori wajib dipilih';
-                  }
-
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-
-                child: ElevatedButton(
-                  onPressed: _simpan,
-                  child: const Text('Simpan'),
-                ),
-              ),
-            ],
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('1. AnimatedContainer', style: tema.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+            width: _besar ? 200 : 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: _besar ? warna.primary : warna.tertiary,
+              borderRadius: BorderRadius.circular(_besar ? 50 : 8),
+            ),
           ),
         ),
+        TextButton(
+          onPressed: () => setState(() => _besar = !_besar),
+          child: const Text('Ubah bentuk'),
+        ),
+        const Divider(),
+        Text('2. AnimatedSwitcher', style: tema.textTheme.titleMedium),
+        Center(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (child, anim) {
+              return ScaleTransition(scale: anim, child: child);
+            },
+            child: Text(
+              '$_hitung',
+              key: ValueKey(_hitung),
+              style: tema.textTheme.displayMedium,
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: () => setState(() => _hitung++),
+          child: const Text('Tambah'),
+        ),
+        const Divider(),
+        Text('3. AnimationController', style: tema.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Center(
+          child: RotationTransition(
+            turns: _putar,
+            child: Icon(Icons.settings, size: 64, color: warna.primary),
+          ),
+        ),
+        TextButton(
+          onPressed: () {
+            if (_putar.isAnimating) {
+              _putar.stop();
+            } else {
+              _putar.repeat();
+            }
+            setState(() {});
+          },
+          child: Text(_putar.isAnimating ? 'Berhenti' : 'Putar'),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------- BAGIAN D: NAVIGASI TAB BAWAH ----------
+class ShellPage extends StatefulWidget {
+  const ShellPage({super.key});
+
+  @override
+  State<ShellPage> createState() => _ShellPageState();
+}
+
+class _ShellPageState extends State<ShellPage> {
+  int _index = 0;
+
+  static const _halaman = [BerandaTab(), AnimasiTab(), PengaturanTab()];
+  static const _judul = ['Beranda', 'Animasi', 'Pengaturan'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(_judul[_index])),
+      body: IndexedStack(index: _index, children: _halaman),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Beranda',
+          ),
+          NavigationDestination(icon: Icon(Icons.animation), label: 'Animasi'),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Pengaturan',
+          ),
+        ],
       ),
     );
   }
