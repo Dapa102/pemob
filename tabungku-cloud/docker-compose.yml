@@ -1,0 +1,60 @@
+# Nama proyek diambil dari .env (COMPOSE_PROJECT_NAME=tabungku) agar nama
+# volume tetap tabungku_mysql_data. Compose V2 juga mendukung `name:`.
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Jakarta
+    ports:
+      # 3307 di laptop agar tidak bentrok dengan MySQL/XAMPP lokal.
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # -h 127.0.0.1 memaksa koneksi TCP; saat inisialisasi pertama MySQL
+      # sementara hanya membuka socket.
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+      TZ: Asia/Jakarta
+    ports:
+      - "8000:8000"
+    volumes:
+      # Bind mount seluruh backend agar revisi Alembic dan kode langsung
+      # terlihat oleh container (uvicorn --reload).
+      - ./backend:/code
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # Tugas Pertemuan 8: Adminer untuk melihat isi database dari browser.
+  adminer:
+    image: adminer:5
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: mysql
+    ports:
+      - "8081:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
